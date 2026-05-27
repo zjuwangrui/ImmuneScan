@@ -1,0 +1,12 @@
+atta_less/blast-2.15.0+/bin/sp.psq filter=lfs diff=lfs merge=lfs -text
+atta_less/ncbi-blast-2.12.0+/bin/swissprot.phr filter=lfs diff=lfs merge=lfs -text
+atta_less/ncbi-blast-2.12.0+/bin/swissprot.psq filter=lfs diff=lfs merge=lfs -text
+atta_less/blast-2.15.0+/bin/swissprot filter=lfs diff=lfs merge=lfs -text
+atta_less/ncbi-blast-2.12.0+/bin/taxdb.btd filter=lfs diff=lfs merge=lfs -text
+resources/class-project2/AI4LS-pHLA.tar.gz filter=lfs diff=lfs merge=lfs -text
+atta_less/blast-2.15.0+/bin/sp.phr filter=lfs diff=lfs merge=lfs -text
+resources/blast-2.15.0+/bin/sp.phr filter=lfs diff=lfs merge=lfs -text
+atta_less/ncbi-blast-2.12.0+/bin/swissprot filter=lfs diff=lfs merge=lfs -text
+resources/class-project2/AI4LS-pHLA.tar.gz filter=lfs diff=lfs merge=lfs -text
+resources/blast-2.15.0+/bin/sp.psq filter=lfs diff=l
+

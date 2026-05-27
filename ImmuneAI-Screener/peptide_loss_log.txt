@@ -1,0 +1,15 @@
+
+LOSS RESULTS of the SLASYLRSM:
+****cdr loss --> 3.737318819168326 given no cdr
+****iedb loss --> 1.6665070114880807
+****structure loss --> [-0.22813375]
+
+LOSS RESULTS of the MALWMRLLP:
+****cdr loss --> 3.0065016944068215 given no cdr
+****iedb loss --> 1.3340416379099407
+****structure loss --> [-0.22759905]
+
+LOSS RESULTS of the SIINFEKL:
+****cdr loss --> 3.0362520423541643 given no cdr
+****iedb loss --> 1.4806794676791575
+****structure loss --> [-0.23729399]

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cp atta_less/data/AB1101*.csv data/attabseq/)",
+      "Bash(cp atta_less/data/*.npy data/attabseq/)",
+      "Bash(cp ImmuneAI-Screener/*.py models/immuneai/)",
+      "Bash(cp ImmuneAI-Screener/database/*.txt data/immuneai/)"
+    ]
+  }
+}

@@ -1,0 +1,5 @@
+ImmuneAI-Screener/.vscode
+.claude
+.venv
+__pycache__
+agent/__pycache__
