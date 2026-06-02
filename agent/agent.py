@@ -15,7 +15,7 @@ from openai import OpenAI
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
-from config import CONFIG, LLM_CONFIG
+from config import CONFIG
 from tools.mutation_processor import generate_candidate_peptides
 from tools.dl_scorer import score_with_dl_model
 from tools.mcmc_optimizer import optimize_with_mcmc
@@ -196,8 +196,8 @@ def run_agent(hla_type: str, mutations: List[Dict]) -> Dict:
         }
     """
     client = OpenAI(
-        api_key=LLM_CONFIG["api_key"],
-        base_url=LLM_CONFIG["base_url"],
+        api_key=CONFIG["llm_api_key"],
+        base_url=CONFIG["llm_base_url"],
     )
 
     task = (
@@ -215,7 +215,7 @@ def run_agent(hla_type: str, mutations: List[Dict]) -> Dict:
 
     while True:
         response = client.chat.completions.create(
-            model=LLM_CONFIG["model"],
+            model=CONFIG["llm_model"],
             max_tokens=4096,
             tools=TOOLS,
             messages=messages,

@@ -1,10 +1,12 @@
 """
-CLI entry point for the Neoantigen Screening Agent.
+Neoantigen Screening Agent entry point.
 
 Usage:
-    python agent/run.py --hla "HLA-A*02:01" --mutations '[{"gene":"TP53","pos":4,"wt":"R","mut":"W","context":"VVRCPHHERCSDSD"}]'
+    python agent/run.py
+
+Input is read from the file specified by CONFIG["input_file"] (default: data/input.json).
+Edit that file to change HLA type or mutations.
 """
-import argparse
 import json
 import sys
 from pathlib import Path
@@ -12,21 +14,26 @@ from pathlib import Path
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
+from config import CONFIG
 from agent.agent import run_agent
 
 
-def _parse_args():
-    p = argparse.ArgumentParser(description="Neoantigen Vaccine Candidate Screener")
-    p.add_argument("--hla", required=True,
-                   help="Patient HLA type (e.g. HLA-A*02:01 or HLA-A*0201)")
-    p.add_argument("--mutations", required=True,
-                   help=(
-                       'JSON list of mutations. Each entry needs: '
-                       'gene, pos (1-indexed in context), wt, mut, context. '
-                       'Example: \'[{"gene":"TP53","pos":4,"wt":"R","mut":"W",'
-                       '"context":"VVRCPHHERCSDSD"}]\''
-                   ))
-    return p.parse_args()
+def _load_input() -> tuple:
+    path = Path(CONFIG["input_file"])
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        print(f"Error: input file not found — {path}", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as exc:
+        print(f"Error: invalid JSON in {path} — {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    if "hla" not in data or "mutations" not in data:
+        print('Error: input JSON must have "hla" and "mutations" fields.', file=sys.stderr)
+        sys.exit(1)
+
+    return data["hla"], data["mutations"]
 
 
 def _print_table(top10):
@@ -59,20 +66,15 @@ def _print_table(top10):
 
 
 def main():
-    args = _parse_args()
-
-    try:
-        mutations = json.loads(args.mutations)
-    except json.JSONDecodeError as exc:
-        print(f"Error: invalid mutations JSON — {exc}", file=sys.stderr)
-        sys.exit(1)
+    hla, mutations = _load_input()
 
     print(f"\nNeoantigen Screening Agent")
-    print(f"  HLA type  : {args.hla}")
+    print(f"  HLA type  : {hla}")
     print(f"  Mutations : {len(mutations)}")
+    print(f"  Input     : {CONFIG['input_file']}")
     print("-" * 50)
 
-    result = run_agent(hla_type=args.hla, mutations=mutations)
+    result = run_agent(hla_type=hla, mutations=mutations)
 
     print("\n" + result["report"])
     _print_table(result["top10"])

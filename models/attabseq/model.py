@@ -288,58 +288,6 @@ class Predictor(nn.Module):
         final2 = self.do(F.relu(self.fc_4(final2)))
         final2 = final2.view(-1)
         
-        if os.path.exists('../1101analysis/ag{}.txt'.format(itera)):
-            f1 = open('../1101analysis/ag{}.txt'.format(itera),'a+')
-            f1.write(str(correct_interaction))
-            f1.write('\n')
-            f1.write(str(ag_ab_norm.tolist()))
-            f1.write('\n')
-        else:
-            f1 = open('../1101analysis/ag{}.txt'.format(itera),'w')
-            f1.write(str(correct_interaction))
-            f1.write('\n')
-            f1.write(str(ag_ab_norm.tolist()))
-            f1.write('\n')
-        
-        if os.path.exists('../1101analysis/ab{}.txt'.format(itera)):
-            f2 = open('../1101analysis/ab{}.txt'.format(itera),'a+')
-            f2.write(str(correct_interaction))
-            f2.write('\n')
-            f2.write(str(ab_ag_norm.tolist()))
-            f2.write('\n')
-        else:
-            f2 = open('../1101analysis/ab{}.txt'.format(itera),'w')
-            f2.write(str(correct_interaction))
-            f2.write('\n')
-            f2.write(str(ab_ag_norm.tolist()))
-            f2.write('\n')
-        
-        if os.path.exists('../1101analysis/ag_mut{}.txt'.format(itera)):
-            f3 = open('../1101analysis/ag_mut{}.txt'.format(itera),'a+')
-            f3.write(str(correct_interaction))
-            f3.write('\n')
-            f3.write(str(ag_ab_m_norm.tolist()))
-            f3.write('\n')
-        else:
-            f3 = open('../1101analysis/ag_mut{}.txt'.format(itera),'w')
-            f3.write(str(correct_interaction))
-            f3.write('\n')
-            f3.write(str(ag_ab_m_norm.tolist()))
-            f3.write('\n')
-        
-        if os.path.exists('../1101analysis/ab_mut{}.txt'.format(itera)):
-            f4 = open('../1101analysis/ab_mut{}.txt'.format(itera),'a+')
-            f4.write(str(correct_interaction))
-            f4.write('\n')
-            f4.write(str(ab_ag_m_norm.tolist()))
-            f4.write('\n')
-        else:
-            f4 = open('../1101analysis/ab_mut{}.txt'.format(itera),'w')
-            f4.write(str(correct_interaction))
-            f4.write('\n')
-            f4.write(str(ab_ag_m_norm.tolist()))
-            f4.write('\n')
-
         return final2
 
     def __call__(self, data, itera, train=True):
@@ -543,8 +491,8 @@ class Tester(object):
                 predicted = predicted.view(1,-1)
                 T = torch.cat([T,correct], dim=-1)
                 Y = torch.cat([Y,predicted], dim=-1)
-        T = T.squeeze()
-        Y = Y.squeeze()
+        T = T.reshape(-1)
+        Y = Y.reshape(-1)
         print('true:', T)
         print('predict:', Y)
         
