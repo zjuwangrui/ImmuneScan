@@ -10,15 +10,17 @@ Edit that file to change HLA type or mutations.
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
 from config import CONFIG
 from agent.agent import run_agent
+from agent.report_writer import write_report
 
 
-def _load_input() -> tuple:
+def _load_input() -> tuple[str, list[Any]]:
     path = Path(CONFIG["input_file"])
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -78,6 +80,15 @@ def main():
 
     print("\n" + result["report"])
     _print_table(result["top10"])
+
+    report_path = write_report(
+        hla=hla,
+        mutations=mutations,
+        top10=result["top10"],
+        agent_report=result["report"],
+        config=CONFIG,
+    )
+    print(f"\nReport saved to: {report_path}")
 
 
 if __name__ == "__main__":
