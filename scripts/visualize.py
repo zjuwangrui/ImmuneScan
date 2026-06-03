@@ -54,12 +54,12 @@ def plot_pipeline(out: Path):
     ax.axis("off")
 
     steps = [
-        ("Input\nHLA + Mutations",    "#4A90D9", 0.6),
-        ("Generate\n9-mer Candidates", "#5BA85A", 2.4),
-        ("Deep Learning\nddG Scoring", "#E87722", 4.7),
-        ("MCMC\nOptimization",         "#9B59B6", 7.0),
-        ("HLA Binding\nValidation",    "#E74C3C", 9.3),
-        ("Top-10\nReport",             "#1ABC9C", 11.6),
+        ("Input\nHLA + Mutations",     "#4A90D9",  1.1),
+        ("Generate\n9-mer Candidates", "#5BA85A",  3.4),
+        ("Deep Learning\nddG Scoring", "#E87722",  5.7),
+        ("MCMC\nOptimization",         "#9B59B6",  8.0),
+        ("HLA Binding\nValidation",    "#E74C3C", 10.3),
+        ("Top-10\nReport",             "#1ABC9C", 12.6),
     ]
 
     subtitles = [
@@ -183,13 +183,18 @@ def plot_scatter(top10: List[Dict[str, Any]], out: Path):
     # ── Auto log-scale if IC50 spans more than one decade ────────────────────
     ic50_raw  = [c["ic50"] for c in valid]
     rank_raw  = [c["percentile_rank"] for c in valid]
-    use_log   = max(ic50_raw) / (min(ic50_raw) + 1e-9) > 10
-    
-    ax.set_xscale("log")
-    ax.set_yscale("log")
+    use_log_x = max(ic50_raw) / (min(ic50_raw) + 1e-9) > 10
+    # Only use log-y when ALL values are strictly positive (log(0) = -inf)
+    # For points with rank = 0 on linear scale: replace with small positive so
+    # they stay visible above the x-axis instead of sitting on it.
+    RANK_FLOOR: float = float(min(r for r in rank_raw if r > 0)) * 0.3 if any(r > 0 for r in rank_raw) else 1e-3
+    rank_display = [r if r > 0 else RANK_FLOOR for r in rank_raw]
+
+    if use_log_x:
+        ax.set_xscale("log")  # type: ignore[attr-defined]
+    ax.set_yscale("log")  # type: ignore[attr-defined]
     # ── Jitter near-identical points ─────────────────────────────────────────
-    # Work in linear space even if axis is log
-    xs_j, ys_j = _jitter_overlapping(ic50_raw, rank_raw)
+    xs_j, ys_j = _jitter_overlapping(ic50_raw, rank_display)
 
     # ── Plot dots (number inside, size ∝ composite_score) ────────────────────
     for rank_idx, (c, xp, yp) in enumerate(zip(valid, xs_j, ys_j)):
@@ -205,23 +210,28 @@ def plot_scatter(top10: List[Dict[str, Any]], out: Path):
                 color="white", zorder=4)
 
     # ── Reference lines & strong-binder zone ─────────────────────────────────
+    # Set axis limits FIRST based on data, then draw reference lines inside range.
     xlim = ax.get_xlim()
-    ylim = (0, max(rank_raw) * 1.15 + 0.5)
-    ax.set_ylim(ylim)
+    x_lo: float = xlim[0]  # type: ignore[assignment]
+    x_hi: float = xlim[1]  # type: ignore[assignment]
+    pos_ranks = [r for r in rank_raw if r > 0]
+    y_lo: float = float(min(pos_ranks)) * 0.1 if pos_ranks else 0.001
+    y_hi: float = float(max(rank_raw)) * 2.0
+    ax.set_ylim(y_lo, y_hi)
 
-    x_cut = 500   # nM — mhcflurry weak-binder cutoff
-    y_cut = 2.0   # %Rank cutoff
-    ax.fill_betweenx([0, y_cut], xlim[0], x_cut,
+    x_cut = min(500.0, x_hi * 0.85)
+    y_cut = min(2.0,   y_hi * 0.85)
+    ax.fill_betweenx([y_lo, y_cut], x_lo, x_cut,
                      color="#2A9D8F", alpha=0.09, label="Strong binder zone")
     ax.axvline(x_cut, color="#E63946", linestyle="--", lw=1.3, alpha=0.7,
-               label=f"IC50 = {x_cut} nM cutoff")
+               label=f"IC50 = {x_cut:.0f} nM cutoff")
     ax.axhline(y_cut, color="#457B9D", linestyle="--", lw=1.3, alpha=0.7,
-               label=f"%Rank = {y_cut} cutoff")
+               label=f"%Rank = {y_cut:.2f} cutoff")
     ax.set_xlim(xlim)
 
     ax.set_xlabel("IC50 (nM)  [lower = stronger binding]", fontsize=10)
     ax.set_ylabel("%Rank  [lower = stronger binding]", fontsize=10)
-    scale_note = " (log scale)" if use_log else ""
+    scale_note = " (log scale)" if use_log_x else ""
     ax.set_title(
         f"HLA Binding Affinity — IC50{scale_note} vs Percentile Rank\n"
         "Number = composite rank · Dot size = composite score",
@@ -300,37 +310,66 @@ def plot_heatmap(top10: List[Dict[str, Any]], out: Path):
         print("  Skip heatmap: no data")
         return
 
-    row_data = {
-        "IC50 (nM)\n[lower=better]":        [c.get("ic50", 0) or 0              for c in valid],
-        "%Rank\n[lower=better]":             [c.get("percentile_rank", 100) or 100 for c in valid],
-        "MCMC Loss\n[lower=better]":         [c.get("mcmc_loss", 0) or 0          for c in valid],
-        "Composite Score\n[higher=better]":  [c.get("composite_score", 0) or 0    for c in valid],
+    def _safe(val: Any, fallback: float) -> float:
+        """Return val if it's a usable finite number, else fallback."""
+        if val is None:
+            return fallback
+        try:
+            f = float(val)
+        except (TypeError, ValueError):
+            return fallback
+        return fallback if (f != f or f == float("inf")) else f
+
+    row_data: Dict[str, List[float]] = {
+        "IC50 (nM)\n[lower=better]":       [_safe(c.get("ic50"),            50000.0) for c in valid],
+        "%Rank\n[lower=better]":            [_safe(c.get("percentile_rank"), 100.0)   for c in valid],
+        "MCMC Loss\n[lower=better]":        [_safe(c.get("mcmc_loss"),       1e9)     for c in valid],
+        "Composite Score\n[higher=better]": [_safe(c.get("composite_score"), 0.0)     for c in valid],
     }
 
-    def _norm_invert(vals):
+    def _norm_invert(vals: List[float]) -> np.ndarray:
         arr = np.array(vals, dtype=float)
-        rng = arr.max() - arr.min()
-        return np.zeros_like(arr) if rng == 0 else (arr.max() - arr) / rng
+        finite = arr[np.isfinite(arr)]
+        if len(finite) == 0:
+            return np.zeros_like(arr)
+        arr = np.clip(arr, None, finite.max())
+        rng = float(arr.max() - arr.min())
+        if rng == 0 or not np.isfinite(rng):
+            return np.zeros_like(arr)
+        return (arr.max() - arr) / rng
 
-    def _norm(vals):
+    def _norm(vals: List[float]) -> np.ndarray:
         arr = np.array(vals, dtype=float)
-        rng = arr.max() - arr.min()
-        return np.zeros_like(arr) if rng == 0 else (arr - arr.min()) / rng
+        rng = float(arr.max() - arr.min())
+        if rng == 0 or not np.isfinite(rng):
+            return np.zeros_like(arr)
+        return (arr - arr.min()) / rng
 
     keys = list(row_data.keys())
     matrix = np.array([
         _norm_invert(row_data[keys[0]]),
-        _norm_invert(row_data[keys[1]]),
+        (row_data[keys[1]]),
         _norm_invert(row_data[keys[2]]),
         _norm(row_data[keys[3]]),
     ])
+    # Raw value matrix for cell labels (same row order as `keys`)
+    raw_matrix: List[List[str]] = []
+    from typing import Callable
+    fmt_map: Dict[str, Callable[[float], str]] = {
+        keys[0]: lambda v: f"{float(v):.0f}",
+        keys[1]: lambda v: f"{float(v):.4f}",
+        keys[2]: lambda v: f"{float(v):.3f}",
+        keys[3]: lambda v: f"{float(v):.4f}",
+    }
+    for k in keys:
+        raw_matrix.append([fmt_map[k](v) for v in row_data[k]])
 
     xlabels = [
         f"{c.get('optimized_peptide', c.get('peptide','?'))}\n({c.get('gene','?')})"
         for c in valid
     ]
 
-    fig, ax = plt.subplots(figsize=(max(8, len(valid) * 1.1), 4.5))
+    fig, ax = plt.subplots(figsize=(max(9, len(valid) * 1.2), 5))
     im = ax.imshow(matrix, cmap="RdYlGn", aspect="auto", vmin=0, vmax=1)
 
     ax.set_xticks(range(len(xlabels)))
@@ -340,13 +379,14 @@ def plot_heatmap(top10: List[Dict[str, Any]], out: Path):
 
     for i in range(matrix.shape[0]):
         for j in range(matrix.shape[1]):
-            ax.text(j, i, f"{matrix[i, j]:.2f}",
-                    ha="center", va="center", fontsize=8,
+            txt = raw_matrix[i][j]
+            ax.text(j, i, txt,
+                    ha="center", va="center", fontsize=7.5,
                     color="black" if 0.3 < matrix[i, j] < 0.8 else "white")
 
     plt.colorbar(im, ax=ax, fraction=0.03, label="Normalized Score (green = better)")
-    ax.set_title("Multi-Metric Evaluation Heatmap (Normalized)",
-                 fontsize=12, fontweight="bold", pad=10)
+    ax.set_title("Multi-Metric Evaluation Heatmap  (cell = raw value, color = normalized rank)",
+                 fontsize=11, fontweight="bold", pad=10)
 
     fig.tight_layout()
     fig.savefig(out, bbox_inches="tight", facecolor="white")
@@ -416,8 +456,16 @@ def plot_agent_advantage(out: Path):
 
 def find_latest_results() -> Path | None:
     reports_dir = ROOT / "data" / "output" / "reports"
-    jsons = sorted(reports_dir.glob("*_results.json")) if reports_dir.exists() else []
-    return jsons[-1] if jsons else None
+    if not reports_dir.exists():
+        return None
+    jsons = list(reports_dir.glob("*_results.json"))
+    if not jsons:
+        return None
+    # Sort by filename (YYYYMMDD_HHMMSS prefix) then fall back to mtime
+    jsons.sort(key=lambda p: (p.stem, p.stat().st_mtime))
+    latest = jsons[-1]
+    print(f"Auto-selected results: {latest}")
+    return latest
 
 
 def main():
