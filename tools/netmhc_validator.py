@@ -17,15 +17,28 @@ def validate_hla_binding(candidates: List[Dict], hla_type: str) -> List[Dict]:
         from mhcflurry import Class1PresentationPredictor
         predictor = Class1PresentationPredictor.load()
 
+        # alleles is a genotype (list of up to 6 alleles for one individual),
+        # NOT repeated per peptide — that's the Class1AffinityPredictor API.
         result_df = predictor.predict(
             peptides=peptides,
-            alleles=[allele] * len(peptides),
+            alleles=[allele],
             include_affinity_percentile=True,
         )
 
-        for i, candidate in enumerate(candidates):
-            row = result_df.iloc[i]
-            ic50 = float(row.get("affinity", row.get("presentation_score", 50000)))
+        # Build a lookup by peptide sequence; result_df may reorder rows.
+        pep_col = "peptide" if "peptide" in result_df.columns else result_df.columns[0]
+        result_by_pep = {row[pep_col]: row for _, row in result_df.iterrows()}
+
+        for candidate in candidates:
+            pep = candidate.get("optimized_peptide", candidate["peptide"])
+            row = result_by_pep.get(pep)
+            if row is None:
+                candidate["ic50"] = None
+                candidate["percentile_rank"] = None
+                candidate["presentation_score"] = None
+                candidate["binder"] = None
+                continue
+            ic50 = float(row.get("affinity", 50000))
             rank = float(row.get("affinity_percentile", 100.0))
             pres = float(row.get("presentation_score", 0.0))
             candidate["ic50"] = ic50

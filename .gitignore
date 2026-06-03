@@ -3,3 +3,4 @@ ImmuneAI-Screener/.vscode
 .venv
 __pycache__
 agent/__pycache__
+history

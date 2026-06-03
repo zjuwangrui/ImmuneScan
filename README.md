@@ -32,7 +32,4 @@
   mhcflurry-downloads fetch
 
   # 运行 Agent
-  python agent/run.py \
-    --hla "HLA-A*02:01" \
-    --mutations '[{"gene":"TP53","pos":4,"wt":"R","mut":"W","context":"VVRCPHHERCSDSD"}]'
-    python agent/run.py   --hla "HLA-A*02:01"  --mutations '[{"gene":"TP53","pos":4,"wt":"R","mut":"W","context":"VVRCPHHERCSDSD"}]'
+  python agent/run.py 

@@ -4,7 +4,8 @@
       "Bash(cp atta_less/data/AB1101*.csv data/attabseq/)",
       "Bash(cp atta_less/data/*.npy data/attabseq/)",
       "Bash(cp ImmuneAI-Screener/*.py models/immuneai/)",
-      "Bash(cp ImmuneAI-Screener/database/*.txt data/immuneai/)"
+      "Bash(cp ImmuneAI-Screener/database/*.txt data/immuneai/)",
+      "Bash(.venv/Scripts/python.exe -c ' *)"
     ]
   }
 }

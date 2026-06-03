@@ -1,13 +1,31 @@
 """
 Wrapper around ImmuneAI-Screener's simulated annealing for peptide optimization.
 """
+import importlib.util
 import sys
 from pathlib import Path
 from typing import List, Dict, Optional
 
-_IMMUNEAI_DIR = str(Path(__file__).parent.parent / "models" / "immuneai")
-if _IMMUNEAI_DIR not in sys.path:
-    sys.path.insert(0, _IMMUNEAI_DIR)
+_IMMUNEAI_DIR = Path(__file__).parent.parent / "models" / "immuneai"
+
+# Load immuneai/main.py by absolute path to avoid sys.path collisions
+# with models/attabseq/main.py which shares the same module name.
+_immuneai_mod = None
+
+def _get_run_immuneai():
+    global _immuneai_mod
+    if _immuneai_mod is None:
+        immuneai_str = str(_IMMUNEAI_DIR)
+        if immuneai_str not in sys.path:
+            sys.path.insert(0, immuneai_str)
+        spec = importlib.util.spec_from_file_location(
+            "immuneai_main", str(_IMMUNEAI_DIR / "main.py")
+        )
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["immuneai_main"] = mod
+        spec.loader.exec_module(mod)
+        _immuneai_mod = mod
+    return _immuneai_mod.run_immuneai
 
 
 def optimize_with_mcmc(
@@ -19,10 +37,8 @@ def optimize_with_mcmc(
     """
     Run simulated-annealing optimization on the top `top_n` candidates.
     Adds 'optimized_peptide' and 'mcmc_loss' fields to each candidate.
-
-    Candidates not in the top_n retain their original peptide sequence.
     """
-    from main import run_immuneai
+    run_immuneai = _get_run_immuneai()
 
     top_n = top_n or config.get("top_n_for_mcmc", 30)
     steps = config.get("mcmc_steps", 500)
@@ -37,7 +53,7 @@ def optimize_with_mcmc(
             )
             candidate["optimized_peptide"] = result["final_sequence"]
             candidate["mcmc_loss"] = result["final_loss"]
-        except Exception as e:
+        except Exception:
             candidate["optimized_peptide"] = candidate["peptide"]
             candidate["mcmc_loss"] = float("inf")
 

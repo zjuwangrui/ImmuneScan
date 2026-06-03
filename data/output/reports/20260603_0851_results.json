@@ -1,0 +1,168 @@
+{
+  "timestamp": "2026-06-03T08:51:16.668718",
+  "hla": "HLA-A*02:01",
+  "mutations": [
+    {
+      "gene": "KRAS",
+      "pos": 9,
+      "wt": "G",
+      "mut": "D",
+      "context": "TEYKLVVVGAGGVGKS",
+      "note": "KRAS G12D — 胰腺癌/结直肠癌最常见驱动突变"
+    },
+    {
+      "gene": "TP53",
+      "pos": 9,
+      "wt": "R",
+      "mut": "H",
+      "context": "SVVVPYEPRTVGSDCT",
+      "note": "TP53 R175H — 最高频肿瘤抑制基因热点突变"
+    },
+    {
+      "gene": "BRAF",
+      "pos": 9,
+      "wt": "V",
+      "mut": "E",
+      "context": "CLATDFGLVKVGTPYW",
+      "note": "BRAF V600E — 黑色素瘤/甲状腺癌驱动突变"
+    },
+    {
+      "gene": "EGFR",
+      "pos": 9,
+      "wt": "L",
+      "mut": "R",
+      "context": "DFLSLIINLRQHLFSV",
+      "note": "EGFR L858R — 非小细胞肺癌靶向治疗相关突变"
+    },
+    {
+      "gene": "PIK3CA",
+      "pos": 9,
+      "wt": "H",
+      "mut": "R",
+      "context": "FSGFELTNHLVNKFQR",
+      "note": "PIK3CA H1047R — 乳腺癌/结直肠癌高频突变"
+    }
+  ],
+  "top10": [
+    {
+      "peptide": "GLEKVGTPY",
+      "wt_peptide": "GLVKVGTPY",
+      "gene": "BRAF",
+      "mutation": "V9E",
+      "context_pos": 2,
+      "ddG": 1.089118242263794,
+      "dl_score": 1.089118242263794,
+      "optimized_peptide": "RLLPFIFTV",
+      "mcmc_loss": 2.176379605241973,
+      "composite_score": 0.7
+    },
+    {
+      "peptide": "VVVDAGGVG",
+      "wt_peptide": "VVVGAGGVG",
+      "gene": "KRAS",
+      "mutation": "G9D",
+      "context_pos": 3,
+      "ddG": 1.0859280824661255,
+      "dl_score": 1.0859280824661255,
+      "optimized_peptide": "RLLKFVFTV",
+      "mcmc_loss": 2.2440556093206334,
+      "composite_score": 0.6988
+    },
+    {
+      "peptide": "VVDAGGVGK",
+      "wt_peptide": "VVGAGGVGK",
+      "gene": "KRAS",
+      "mutation": "G9D",
+      "context_pos": 2,
+      "ddG": 0.8958282470703125,
+      "dl_score": 0.8958282470703125,
+      "optimized_peptide": "RLYKFVFTV",
+      "mcmc_loss": 2.2295642741115964,
+      "composite_score": 0.629
+    },
+    {
+      "peptide": "LATDFGLEK",
+      "wt_peptide": "LATDFGLVK",
+      "gene": "BRAF",
+      "mutation": "V9E",
+      "context_pos": 7,
+      "ddG": 0.7339874505996704,
+      "dl_score": 0.7339874505996704,
+      "optimized_peptide": "RLFGFIFTV",
+      "mcmc_loss": 2.1789018855331537,
+      "composite_score": 0.5696
+    },
+    {
+      "peptide": "YKLVVVDAG",
+      "wt_peptide": "YKLVVVGAG",
+      "gene": "KRAS",
+      "mutation": "G9D",
+      "context_pos": 6,
+      "ddG": 0.7195844650268555,
+      "dl_score": 0.7195844650268555,
+      "optimized_peptide": "RLFKFIFTV",
+      "mcmc_loss": 2.173248117893235,
+      "composite_score": 0.5643
+    },
+    {
+      "peptide": "ATDFGLEKV",
+      "wt_peptide": "ATDFGLVKV",
+      "gene": "BRAF",
+      "mutation": "V9E",
+      "context_pos": 6,
+      "ddG": 0.6811584234237671,
+      "dl_score": 0.6811584234237671,
+      "optimized_peptide": "RLFPFVFTV",
+      "mcmc_loss": 2.1575184876791504,
+      "composite_score": 0.5502
+    },
+    {
+      "peptide": "KLVVVDAGG",
+      "wt_peptide": "KLVVVGAGG",
+      "gene": "KRAS",
+      "mutation": "G9D",
+      "context_pos": 5,
+      "ddG": 0.6493076086044312,
+      "dl_score": 0.6493076086044312,
+      "optimized_peptide": "RLFDFVFTV",
+      "mcmc_loss": 2.1931149681745348,
+      "composite_score": 0.5385
+    },
+    {
+      "peptide": "LVVVDAGGV",
+      "wt_peptide": "LVVVGAGGV",
+      "gene": "KRAS",
+      "mutation": "G9D",
+      "context_pos": 4,
+      "ddG": 0.6386454105377197,
+      "dl_score": 0.6386454105377197,
+      "optimized_peptide": "YLFPFIFTL",
+      "mcmc_loss": 2.1769200479267905,
+      "composite_score": 0.5346
+    },
+    {
+      "peptide": "GFELTNRLV",
+      "wt_peptide": "GFELTNHLV",
+      "gene": "PIK3CA",
+      "mutation": "H9R",
+      "context_pos": 6,
+      "ddG": 0.5678183436393738,
+      "dl_score": 0.5678183436393738,
+      "optimized_peptide": "RLFPFIFYL",
+      "mcmc_loss": 2.1994088845429847,
+      "composite_score": 0.5085
+    },
+    {
+      "peptide": "FELTNRLVN",
+      "wt_peptide": "FELTNHLVN",
+      "gene": "PIK3CA",
+      "mutation": "H9R",
+      "context_pos": 5,
+      "ddG": 0.4449038803577423,
+      "dl_score": 0.4449038803577423,
+      "optimized_peptide": "RLLDFIFTV",
+      "mcmc_loss": 2.2119760857373576,
+      "composite_score": 0.4634
+    }
+  ]
+}

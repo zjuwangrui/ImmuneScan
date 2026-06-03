@@ -1,0 +1,47 @@
+{
+  "timestamp": "2026-06-02T22:09:24.989145",
+  "hla": "HLA-A*02:01",
+  "mutations": [
+    {
+      "gene": "KRAS",
+      "pos": 9,
+      "wt": "G",
+      "mut": "D",
+      "context": "TEYKLVVVGAGGVGKS",
+      "note": "KRAS G12D — 胰腺癌/结直肠癌最常见驱动突变"
+    },
+    {
+      "gene": "TP53",
+      "pos": 9,
+      "wt": "R",
+      "mut": "H",
+      "context": "SVVVPYEPRTVGSDCT",
+      "note": "TP53 R175H — 最高频肿瘤抑制基因热点突变"
+    },
+    {
+      "gene": "BRAF",
+      "pos": 9,
+      "wt": "V",
+      "mut": "E",
+      "context": "CLATDFGLVKVGTPYW",
+      "note": "BRAF V600E — 黑色素瘤/甲状腺癌驱动突变"
+    },
+    {
+      "gene": "EGFR",
+      "pos": 9,
+      "wt": "L",
+      "mut": "R",
+      "context": "DFLSLIINLRQHLFSV",
+      "note": "EGFR L858R — 非小细胞肺癌靶向治疗相关突变"
+    },
+    {
+      "gene": "PIK3CA",
+      "pos": 9,
+      "wt": "H",
+      "mut": "R",
+      "context": "FSGFELTNHLVNKFQR",
+      "note": "PIK3CA H1047R — 乳腺癌/结直肠癌高频突变"
+    }
+  ],
+  "top10": []
+}

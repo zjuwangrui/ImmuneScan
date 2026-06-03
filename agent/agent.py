@@ -24,7 +24,28 @@ from tools.netmhc_validator import validate_hla_binding
 import numpy as np
 
 # ─────────────────────────────────────────────
+#  Session store — tools read/write here so the
+#  LLM never has to echo large candidate lists.
+# ─────────────────────────────────────────────
+
+_STORE: Dict[str, list] = {}
+
+
+def _summary(candidates: list, n: int = 3) -> dict:
+    """Return a compact summary for the LLM (not the full list)."""
+    sample = [
+        {k: v for k, v in c.items()
+         if k in ("peptide", "optimized_peptide", "gene", "mutation",
+                  "ddG", "dl_score", "mcmc_loss", "ic50", "percentile_rank")}
+        for c in candidates[:n]
+    ]
+    return {"count": len(candidates), "top_sample": sample}
+
+
+# ─────────────────────────────────────────────
 #  Tool schemas (OpenAI function-calling format)
+#  Subsequent steps read candidates from the
+#  session store — no need to pass them as args.
 # ─────────────────────────────────────────────
 
 TOOLS = [
@@ -34,22 +55,22 @@ TOOLS = [
             "name": "generate_candidates",
             "description": (
                 "Generate all 9-mer peptide windows from tumor mutation context sequences. "
-                "Each window that spans the mutated position becomes a candidate neoantigen."
+                "Results are stored internally for the next step."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "mutations": {
                         "type": "array",
-                        "description": "List of tumor mutations",
+                        "description": "List of tumor mutations (pass the full list from the user input)",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "gene":    {"type": "string", "description": "Gene name"},
-                                "pos":     {"type": "integer", "description": "1-indexed position in context"},
-                                "wt":      {"type": "string", "description": "Wildtype amino acid"},
-                                "mut":     {"type": "string", "description": "Mutant amino acid"},
-                                "context": {"type": "string", "description": "Protein sequence context (>=9 aa)"},
+                                "gene":    {"type": "string"},
+                                "pos":     {"type": "integer"},
+                                "wt":      {"type": "string"},
+                                "mut":     {"type": "string"},
+                                "context": {"type": "string"},
                             },
                             "required": ["pos", "wt", "mut", "context"],
                         },
@@ -64,20 +85,10 @@ TOOLS = [
         "function": {
             "name": "score_with_dl",
             "description": (
-                "Score candidate peptides with the AttABseq deep learning model. "
-                "Predicts ddG (binding affinity change); higher |ddG| = more significant mutation. "
-                "Returns candidates sorted by |ddG| descending."
+                "Score the candidates from the previous step with the AttABseq deep learning model. "
+                "Reads candidates internally — no arguments needed."
             ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "candidates": {
-                        "type": "array",
-                        "description": "Peptide candidates from generate_candidates",
-                    },
-                },
-                "required": ["candidates"],
-            },
+            "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
     {
@@ -85,16 +96,12 @@ TOOLS = [
         "function": {
             "name": "optimize_with_mcmc",
             "description": (
-                "Optimize top candidates with simulated annealing (ImmuneAI-Screener) "
-                "to improve T-cell recognition potential. Adds optimized_peptide and mcmc_loss."
+                "Optimize top candidates with simulated annealing to improve T-cell recognition. "
+                "Reads scored candidates internally."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "candidates": {
-                        "type": "array",
-                        "description": "Scored candidates (will optimize top top_n)",
-                    },
                     "hla_type": {
                         "type": "string",
                         "description": "Patient HLA allele, e.g. HLA-A*02:01",
@@ -104,7 +111,7 @@ TOOLS = [
                         "description": "Number of top candidates to optimize (default 30)",
                     },
                 },
-                "required": ["candidates", "hla_type"],
+                "required": ["hla_type"],
             },
         },
     },
@@ -113,51 +120,76 @@ TOOLS = [
         "function": {
             "name": "validate_hla_binding",
             "description": (
-                "Predict HLA-peptide binding affinity via mhcflurry. "
-                "Returns ic50 (nM), percentile_rank (%), and binder flag for each candidate. "
-                "Lower IC50 and rank = stronger binder = better vaccine candidate."
+                "Predict HLA-peptide binding affinity via mhcflurry (IC50, %rank, binder flag). "
+                "Reads optimized candidates internally."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "candidates": {
-                        "type": "array",
-                        "description": "Optimized candidates from optimize_with_mcmc",
-                    },
                     "hla_type": {
                         "type": "string",
                         "description": "Patient HLA allele",
                     },
                 },
-                "required": ["candidates", "hla_type"],
+                "required": ["hla_type"],
             },
         },
     },
 ]
 
 # ─────────────────────────────────────────────
-#  Tool dispatch table
+#  Tool dispatch table (reads/writes _STORE)
 # ─────────────────────────────────────────────
 
-TOOL_FUNCTIONS = {
-    "generate_candidates": lambda inp: generate_candidate_peptides(
+def _tool_generate_candidates(inp: dict) -> dict:
+    candidates = generate_candidate_peptides(
         mutations=inp["mutations"],
         peptide_length=CONFIG.get("peptide_length", 9),
-    ),
-    "score_with_dl": lambda inp: score_with_dl_model(
-        candidates=inp["candidates"],
+    )
+    _STORE["raw"] = candidates
+    return _summary(candidates)
+
+
+def _tool_score_with_dl(inp: dict) -> dict:
+    candidates = score_with_dl_model(
+        candidates=_STORE.get("raw", []),
         config=CONFIG,
-    ),
-    "optimize_with_mcmc": lambda inp: optimize_with_mcmc(
-        candidates=inp["candidates"],
+    )
+    _STORE["scored"] = candidates
+    return _summary(candidates)
+
+
+def _tool_optimize_with_mcmc(inp: dict) -> dict:
+    candidates = optimize_with_mcmc(
+        candidates=_STORE.get("scored", []),
         hla_type=inp["hla_type"],
         config=CONFIG,
         top_n=inp.get("top_n"),
-    ),
-    "validate_hla_binding": lambda inp: validate_hla_binding(
-        candidates=inp["candidates"],
-        hla_type=inp["hla_type"],
-    ),
+    )
+    _STORE["optimized"] = candidates
+    return _summary(candidates)
+
+
+def _tool_validate_hla_binding(inp: dict) -> dict:
+    try:
+        candidates = validate_hla_binding(
+            candidates=_STORE.get("optimized", []),
+            hla_type=inp["hla_type"],
+        )
+        _STORE["validated"] = candidates
+        return _summary(candidates)
+    except Exception as exc:
+        import traceback as _tb
+        print(f"  [validate ERROR] {exc}", flush=True)
+        _tb.print_exc()
+        return {"error": str(exc), "count": 0}
+
+
+TOOL_FUNCTIONS = {
+    "generate_candidates":  _tool_generate_candidates,
+    "score_with_dl":        _tool_score_with_dl,
+    "optimize_with_mcmc":   _tool_optimize_with_mcmc,
+    "validate_hla_binding": _tool_validate_hla_binding,
 }
 
 # ─────────────────────────────────────────────
@@ -169,10 +201,12 @@ SYSTEM_PROMPT = """You are an expert neoantigen vaccine design assistant.
 Your goal: given a patient's HLA type and a list of tumor mutations, identify the Top 10 peptide candidates for a personalized cancer vaccine.
 
 Pipeline (execute in this order):
-1. generate_candidates — produce all 9-mer peptide windows spanning each mutation
-2. score_with_dl       — rank by |ddG| using the AttABseq deep learning model
-3. optimize_with_mcmc  — improve TCR recognition via simulated annealing (top 30)
-4. validate_hla_binding — predict HLA binding with mhcflurry (IC50, %rank)
+1. generate_candidates — pass the full mutations list from the user input
+2. score_with_dl       — no arguments needed; reads previous results internally
+3. optimize_with_mcmc  — pass hla_type (and optionally top_n); reads previous results internally
+4. validate_hla_binding — pass hla_type; reads previous results internally
+
+Each tool returns only a compact summary. The full candidate list is managed internally.
 
 After all four steps, rank the validated candidates using a composite score:
   composite = 0.4 × norm(|ddG|) + 0.3 × norm(1/mcmc_loss) + 0.3 × norm(1/percentile_rank)
@@ -195,6 +229,8 @@ def run_agent(hla_type: str, mutations: List[Dict]) -> Dict:
             "report": final text report from the LLM,
         }
     """
+    _STORE.clear()
+
     client = OpenAI(
         api_key=CONFIG["llm_api_key"],
         base_url=CONFIG["llm_base_url"],
@@ -211,7 +247,6 @@ def run_agent(hla_type: str, mutations: List[Dict]) -> Dict:
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user",   "content": task},
     ]
-    validated_candidates: List[Dict] = []
 
     while True:
         response = client.chat.completions.create(
@@ -222,7 +257,6 @@ def run_agent(hla_type: str, mutations: List[Dict]) -> Dict:
         )
 
         msg = response.choices[0].message
-        # append as dict so it serializes cleanly in subsequent turns
         messages.append(msg.model_dump(exclude_unset=True))
 
         finish_reason = response.choices[0].finish_reason
@@ -234,17 +268,21 @@ def run_agent(hla_type: str, mutations: List[Dict]) -> Dict:
             break
 
         for tool_call in (msg.tool_calls or []):
-            print(f"  [agent] → {tool_call.function.name}", flush=True)
-            fn  = TOOL_FUNCTIONS.get(tool_call.function.name)
-            inp = json.loads(tool_call.function.arguments)
+            name = tool_call.function.name
+            print(f"  [agent] → {name}", flush=True)
+
+            fn = TOOL_FUNCTIONS.get(name)
+            try:
+                inp = json.loads(tool_call.function.arguments) if tool_call.function.arguments.strip() else {}
+            except json.JSONDecodeError as exc:
+                print(f"  [agent] ⚠ bad arguments JSON for {name}: {exc}", flush=True)
+                inp = {}
 
             if fn is None:
-                result = {"error": f"unknown tool: {tool_call.function.name}"}
+                result = {"error": f"unknown tool: {name}"}
             else:
                 try:
                     result = fn(inp)
-                    if tool_call.function.name == "validate_hla_binding":
-                        validated_candidates = result
                 except Exception as exc:
                     result = {"error": str(exc)}
 
@@ -256,7 +294,19 @@ def run_agent(hla_type: str, mutations: List[Dict]) -> Dict:
 
     report = response.choices[0].message.content or ""
 
-    top10 = _rank_candidates(validated_candidates)[:CONFIG.get("top_n_output", 10)]
+    print(f"  [agent] store keys after run: {list(_STORE.keys())}", flush=True)
+    for k, v in _STORE.items():
+        print(f"    {k}: {len(v)} candidates", flush=True)
+
+    # Fallback chain: use the furthest-completed step
+    candidates = (
+        _STORE.get("validated")
+        or _STORE.get("optimized")
+        or _STORE.get("scored")
+        or _STORE.get("raw")
+        or []
+    )
+    top10 = _rank_candidates(candidates)[:CONFIG.get("top_n_output", 10)]
     return {"top10": top10, "report": report}
 
 

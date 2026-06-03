@@ -142,6 +142,18 @@ def write_report(
     now       = datetime.now()
     timestamp = now.strftime("%Y%m%d_%H%M")
     out_path  = reports_dir / f"{timestamp}_neoantigen_report.md"
+    json_path = reports_dir / f"{timestamp}_results.json"
+
+    # Save structured JSON for visualization script
+    json_path.write_text(
+        json.dumps({
+            "timestamp": now.isoformat(),
+            "hla": hla,
+            "mutations": mutations,
+            "top10": top10,
+        }, indent=2, default=str, ensure_ascii=False),
+        encoding="utf-8",
+    )
 
     print("  [report] Calling LLM for narrative enrichment…")
     client    = OpenAI(api_key=config["llm_api_key"], base_url=config["llm_base_url"])
