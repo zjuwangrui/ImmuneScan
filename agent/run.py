@@ -17,7 +17,6 @@ sys.path.insert(0, str(ROOT))
 
 from config import CONFIG
 from agent.agent import run_agent
-from agent.report_writer import write_report
 
 
 def _load_input() -> tuple[str, list[Any]]:
@@ -55,16 +54,13 @@ def _print_table(top10):
         rank     = c.get("percentile_rank")
         score    = c.get("composite_score", 0)
 
-        print(
-            f"{i:<5} "
-            f"{peptide:<12} "
-            f"{mutation:<12} "
-            f"{ddg:>7.3f} " if ddg is not None else f"{'N/A':>8} "
-            f"{mcmc:>10.3f} " if mcmc is not None and mcmc != float('inf') else f"{'N/A':>11} "
-            f"{ic50:>10.1f} " if ic50 is not None else f"{'N/A':>11} "
-            f"{rank:>7.2f} " if rank is not None else f"{'N/A':>8} "
-            f"{score:>7.4f}"
-        )
+        col_ddg   = f"{ddg:>7.3f}"  if ddg  is not None                          else f"{'N/A':>7}"
+        col_mcmc  = f"{mcmc:>10.3f}" if (mcmc is not None and mcmc != float('inf')) else f"{'N/A':>10}"
+        col_ic50  = f"{ic50:>10.1f}" if ic50  is not None                         else f"{'N/A':>10}"
+        col_rank  = f"{rank:>7.3f}"  if rank  is not None                         else f"{'N/A':>7}"
+        col_score = f"{score:>7.4f}"
+
+        print(f"{i:<5} {peptide:<12} {mutation:<12} {col_ddg} {col_mcmc} {col_ic50} {col_rank} {col_score}")
 
 
 def main():
@@ -78,17 +74,7 @@ def main():
 
     result = run_agent(hla_type=hla, mutations=mutations)
 
-    print("\n" + result["report"])
     _print_table(result["top10"])
-
-    report_path = write_report(
-        hla=hla,
-        mutations=mutations,
-        top10=result["top10"],
-        agent_report=result["report"],
-        config=CONFIG,
-    )
-    print(f"\nReport saved to: {report_path}")
 
 
 if __name__ == "__main__":

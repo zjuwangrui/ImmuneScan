@@ -96,7 +96,7 @@ TOOLS = [
         "function": {
             "name": "optimize_with_mcmc",
             "description": (
-                "Optimize top candidates with simulated annealing to improve T-cell recognition. "
+                "Optimize all candidates with simulated annealing to improve T-cell recognition. "
                 "Reads scored candidates internally."
             ),
             "parameters": {
@@ -105,10 +105,6 @@ TOOLS = [
                     "hla_type": {
                         "type": "string",
                         "description": "Patient HLA allele, e.g. HLA-A*02:01",
-                    },
-                    "top_n": {
-                        "type": "integer",
-                        "description": "Number of top candidates to optimize (default 30)",
                     },
                 },
                 "required": ["hla_type"],
@@ -292,7 +288,9 @@ def run_agent(hla_type: str, mutations: List[Dict]) -> Dict:
                 "content":      json.dumps(result, default=str),
             })
 
-    report = response.choices[0].message.content or ""
+        # All four pipeline steps done — exit immediately, skip LLM summary
+        if "validated" in _STORE:
+            break
 
     print(f"  [agent] store keys after run: {list(_STORE.keys())}", flush=True)
     for k, v in _STORE.items():
@@ -307,7 +305,7 @@ def run_agent(hla_type: str, mutations: List[Dict]) -> Dict:
         or []
     )
     top10 = _rank_candidates(candidates)[:CONFIG.get("top_n_output", 10)]
-    return {"top10": top10, "report": report}
+    return {"top10": top10}
 
 
 def _rank_candidates(candidates: List[Dict]) -> List[Dict]:
@@ -316,10 +314,15 @@ def _rank_candidates(candidates: List[Dict]) -> List[Dict]:
         return []
 
     def _safe_norm(values, invert=False):
-        arr = np.array([v if v is not None else (0 if not invert else 1e9)
+        arr = np.array([v if (v is not None and np.isfinite(v)) else (0.0 if not invert else 0.0)
                         for v in values], dtype=float)
+        # Replace inf with max finite value (or 0 if none)
+        finite_mask = np.isfinite(arr)
+        if not finite_mask.any():
+            return np.zeros_like(arr)
+        arr[~finite_mask] = arr[finite_mask].max() if not invert else arr[finite_mask].max()
         rng = arr.max() - arr.min()
-        if rng == 0:
+        if rng == 0 or not np.isfinite(rng):
             return np.zeros_like(arr)
         normed = (arr - arr.min()) / rng
         return 1.0 - normed if invert else normed

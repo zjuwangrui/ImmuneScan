@@ -31,7 +31,7 @@ CONFIG: dict[str, Any] = {
 
     # ── Pipeline parameters ──────────────────────────────────────────────
     "peptide_length":       9,
-    "top_n_for_mcmc":       30,
+    "top_n_for_mcmc":       100,
     "top_n_output":         10,
 
     # ── Input / Output ───────────────────────────────────────────────────

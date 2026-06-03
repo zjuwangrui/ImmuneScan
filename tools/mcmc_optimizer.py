@@ -35,15 +35,14 @@ def optimize_with_mcmc(
     top_n: Optional[int] = None,
 ) -> List[Dict]:
     """
-    Run simulated-annealing optimization on the top `top_n` candidates.
+    Run simulated-annealing optimization on all candidates.
     Adds 'optimized_peptide' and 'mcmc_loss' fields to each candidate.
     """
     run_immuneai = _get_run_immuneai()
 
-    top_n = top_n or config.get("top_n_for_mcmc", 30)
     steps = config.get("mcmc_steps", 500)
 
-    for candidate in candidates[:top_n]:
+    for candidate in candidates:
         try:
             result = run_immuneai(
                 start_pep=candidate["peptide"],
@@ -56,9 +55,5 @@ def optimize_with_mcmc(
         except Exception:
             candidate["optimized_peptide"] = candidate["peptide"]
             candidate["mcmc_loss"] = float("inf")
-
-    for candidate in candidates[top_n:]:
-        candidate.setdefault("optimized_peptide", candidate["peptide"])
-        candidate.setdefault("mcmc_loss", float("inf"))
 
     return candidates

@@ -1,6 +1,7 @@
 ImmuneAI-Screener/.vscode
 .claude
 .venv
+.vscode
 __pycache__
 agent/__pycache__
 history
