@@ -1,239 +1,241 @@
 """
-Report writer: generates a rich markdown report from agent results,
-calling the LLM once more to add plain-language explanations.
+Report writer — generates Markdown and JSON reports with no LLM involvement.
+All content is derived directly from pipeline inputs and outputs.
 """
 import json
-from datetime import datetime
+import datetime
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Optional
 
-from openai import OpenAI
-
-
-# ─────────────────────────────────────────────
-#  Markdown table builders
-# ─────────────────────────────────────────────
-
-def _config_table(config: dict) -> str:
-    rows = [
-        ("LLM 模型",          config.get("llm_model", "N/A")),
-        ("LLM 接口地址",      config.get("llm_base_url", "N/A")),
-        ("候选肽段长度",      config.get("peptide_length", "N/A")),
-        ("MCMC 步数",         config.get("mcmc_steps", "N/A")),
-        ("MCMC 突变率",       config.get("mcmc_mutation_rate", "N/A")),
-        ("MCMC 温度",         config.get("mcmc_temperature", "N/A")),
-        ("MCMC 半衰期",       config.get("mcmc_half_life", "N/A")),
-        ("MCMC 优化 Top-N",   config.get("top_n_for_mcmc", "N/A")),
-        ("最终输出 Top-N",    config.get("top_n_output", "N/A")),
-        ("输入文件",          config.get("input_file", "N/A")),
-        ("输出目录",          config.get("output_dir", "N/A")),
-    ]
-    lines = ["| 参数 | 值 |", "|------|-----|"]
-    for label, val in rows:
-        lines.append(f"| {label} | `{val}` |")
-    return "\n".join(lines)
-
-
-def _mutations_table(mutations: List[Dict]) -> str:
-    lines = [
-        "| 基因 | 突变位置 | 野生型氨基酸 | 突变型氨基酸 | 上下文序列 |",
-        "|------|----------|------------|------------|----------|",
-    ]
-    for m in mutations:
-        lines.append(
-            f"| {m.get('gene','?')} | {m.get('pos','?')} | "
-            f"{m.get('wt','?')} | {m.get('mut','?')} | `{m.get('context','?')}` |"
-        )
-    return "\n".join(lines)
-
-
-def _results_table(top10: List[Dict]) -> str:
-    lines = [
-        "| 排名 | 肽段序列 | 基因/突变 | ddG | MCMC Loss | IC50 (nM) | %Rank | 综合评分 |",
-        "|------|---------|----------|-----|-----------|-----------|-------|---------|",
-    ]
-    for i, c in enumerate(top10, 1):
-        peptide  = c.get("optimized_peptide", c.get("peptide", "?"))
-        gene     = c.get("gene", "?")
-        mutation = c.get("mutation", "?")
-        ddg      = f"{c['ddG']:.3f}"             if c.get("ddG")             is not None else "N/A"
-        mcmc     = f"{c['mcmc_loss']:.3f}"        if c.get("mcmc_loss")       is not None else "N/A"
-        ic50     = f"{c['ic50']:.1f}"             if c.get("ic50")            is not None else "N/A"
-        rank     = f"{c['percentile_rank']:.2f}"  if c.get("percentile_rank") is not None else "N/A"
-        score    = f"{c.get('composite_score', 0):.4f}"
-        lines.append(
-            f"| {i} | `{peptide}` | {gene}/{mutation} | {ddg} | {mcmc} | {ic50} | {rank} | {score} |"
-        )
-    return "\n".join(lines)
-
-
-# ─────────────────────────────────────────────
-#  LLM narrative generation
-# ─────────────────────────────────────────────
-
-_NARRATIVE_PROMPT = """\
-你是一位擅长将复杂生物医学研究转化为通俗报告的科学作家。
-请为以下个性化肿瘤新抗原疫苗筛选结果撰写报告内容，面向患者家属或非专业读者，语言务必通俗。
-
-【患者信息】
-HLA 分型：{hla}
-肿瘤突变：{mutations_json}
-
-【筛选结果（Top 候选肽段）】
-{candidates_json}
-
-请返回一个 JSON 对象，包含以下字段（均为字符串）：
-- background        : 200字以内，通俗介绍"个性化肿瘤新抗原疫苗"是什么、为什么重要
-- agent_value       : 60字以内，说明用 AI Agent 自动完成此流程相比人工的优势
-- pipeline_steps    : 对 4 步流水线的通俗说明（生成候选→深度学习打分→MCMC优化→HLA结合验证），每步 1-2 句话，用换行分隔
-- results_interpretation : 对 Top 候选的通俗解读，重点解释 IC50、%Rank 的含义和为什么数值越低越好
-- clinical_significance  : 100字以内，说明本报告对患者个性化治疗的潜在价值
-- lead_candidate_highlight : 对排名第一的候选肽段做一句话亮点总结
-
-只返回 JSON，不要任何额外内容。\
-"""
-
-
-def _llm_narrative(client: OpenAI, model: str,
-                   hla: str, mutations: List[Dict], top10: List[Dict]) -> Dict[str, str]:
-    prompt = _NARRATIVE_PROMPT.format(
-        hla=hla,
-        mutations_json=json.dumps(mutations, ensure_ascii=False, indent=2),
-        candidates_json=json.dumps(top10, ensure_ascii=False, indent=2, default=str),
-    )
-    try:
-        resp = client.chat.completions.create(
-            model=model,
-            max_tokens=2000,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-        )
-        return json.loads(resp.choices[0].message.content)
-    except Exception as exc:
-        print(f"  [report] LLM narrative failed: {exc}, using fallback text.")
-        return {
-            "background":              "个性化肿瘤新抗原疫苗基于患者肿瘤的特异性突变定制，有望实现精准免疫治疗。",
-            "agent_value":             "AI Agent 全自动完成四步流水线，分钟级出结果，无需人工干预。",
-            "pipeline_steps":          "1. 生成候选肽段\n2. 深度学习评分\n3. MCMC 优化\n4. HLA 结合验证",
-            "results_interpretation":  "IC50 越低、%Rank 越小，代表肽段与 HLA 结合越紧密，更适合作为疫苗候选。",
-            "clinical_significance":   "本报告可为临床个性化疫苗设计提供计算辅助决策参考。",
-            "lead_candidate_highlight": "排名第一的候选肽段综合评分最高，建议优先考虑。",
-        }
-
-
-# ─────────────────────────────────────────────
-#  Main entry
-# ─────────────────────────────────────────────
 
 def write_report(
     hla: str,
     mutations: List[Dict],
     top10: List[Dict],
-    agent_report: str,
-    config: dict,
+    config: Dict[str, Any],
+    run_duration_s: Optional[float] = None,
 ) -> Path:
     """
-    Assemble a rich markdown report and save to output_dir/reports/.
-    Returns the path to the written file.
+    Write <timestamp>_report.md and <timestamp>_results.json to output_dir/reports/.
+    Returns the path to the Markdown report.
     """
-    reports_dir = Path(config["output_dir"]) / "reports"
-    reports_dir.mkdir(parents=True, exist_ok=True)
+    ts     = datetime.datetime.now()
+    ts_str = ts.strftime("%Y%m%d_%H%M%S")
 
-    now       = datetime.now()
-    timestamp = now.strftime("%Y%m%d_%H%M")
-    out_path  = reports_dir / f"{timestamp}_neoantigen_report.md"
-    json_path = reports_dir / f"{timestamp}_results.json"
+    out_dir = Path(config.get("output_dir", "data/output")) / "reports"
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save structured JSON for visualization script
-    json_path.write_text(
-        json.dumps({
-            "timestamp": now.isoformat(),
-            "hla": hla,
+    payload = {
+        "meta": {
+            "timestamp":      ts.isoformat(),
+            "hla":            hla,
+            "llm_model":      config.get("llm_model", "N/A"),
+            "mcmc_steps":     config.get("mcmc_steps"),
+            "peptide_length": config.get("peptide_length"),
+            "top_n_output":   config.get("top_n_output"),
+            "run_duration_s": run_duration_s,
+            "input_file":     config.get("input_file"),
+            "output_dir":     config.get("output_dir"),
+        },
+        "input": {
+            "hla":       hla,
             "mutations": mutations,
-            "top10": top10,
-        }, indent=2, default=str, ensure_ascii=False),
+        },
+        "top10": top10,
+    }
+
+    json_path = out_dir / f"{ts_str}_results.json"
+    json_path.write_text(
+        json.dumps(payload, indent=2, default=str, ensure_ascii=False),
         encoding="utf-8",
     )
 
-    print("  [report] Calling LLM for narrative enrichment…")
-    client    = OpenAI(api_key=config["llm_api_key"], base_url=config["llm_base_url"])
-    narrative = _llm_narrative(client, config["llm_model"], hla, mutations, top10)
+    md_path = out_dir / f"{ts_str}_report.md"
+    md_path.write_text(_build_markdown(payload), encoding="utf-8")
 
-    sections = [
-        f"# 个性化肿瘤新抗原疫苗候选筛选报告",
-        f"",
-        f"> **生成时间：** {now.strftime('%Y-%m-%d %H:%M')}",
-        f"> **患者 HLA 分型：** `{hla}`",
-        f"> **肿瘤突变数：** {len(mutations)} 个",
-        f"> **最终候选数：** {len(top10)} 个",
-        f"",
-        f"---",
-        f"",
-        f"## 一、项目背景与意义",
-        f"",
-        narrative["background"],
-        f"",
-        f"**为什么用 AI Agent？** {narrative['agent_value']}",
-        f"",
-        f"---",
-        f"",
-        f"## 二、运行配置",
-        f"",
-        _config_table(config),
-        f"",
-        f"---",
-        f"",
-        f"## 三、输入数据",
-        f"",
-        f"**患者 HLA 分型：** `{hla}`",
-        f"",
-        f"### 肿瘤突变列表",
-        f"",
-        _mutations_table(mutations),
-        f"",
-        f"> 输入文件：`{config.get('input_file', 'N/A')}`",
-        f"",
-        f"---",
-        f"",
-        f"## 四、流水线执行过程",
-        f"",
-        narrative["pipeline_steps"],
-        f"",
-        f"---",
-        f"",
-        f"## 五、候选结果",
-        f"",
-        f"### Top 候选肽段排名",
-        f"",
-        _results_table(top10),
-        f"",
-        f"> **亮点：** {narrative['lead_candidate_highlight']}",
-        f"",
-        f"### 结果解读",
-        f"",
-        narrative["results_interpretation"],
-        f"",
-        f"---",
-        f"",
-        f"## 六、临床意义",
-        f"",
-        narrative["clinical_significance"],
-        f"",
-        f"---",
-        f"",
-        f"## 七、Agent 完整报告（原文）",
-        f"",
-        agent_report.strip(),
-        f"",
-        f"---",
-        f"",
-        f"## 八、原始候选数据",
-        f"",
-        f"```json",
-        json.dumps(top10, indent=2, default=str, ensure_ascii=False),
-        f"```",
-        f"",
+    return md_path
+
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+def _f(val: Any, fmt: str, fallback: str = "N/A") -> str:
+    """Format a value safely; return fallback on None / inf / error."""
+    if val is None:
+        return fallback
+    if isinstance(val, float) and (val != val or val == float("inf")):   # nan or inf
+        return fallback
+    try:
+        return format(val, fmt)
+    except (ValueError, TypeError):
+        return str(val)
+
+
+def _hi_context(context: str, pos: Any) -> str:
+    """Bold the mutated residue inside the context string (Markdown)."""
+    if not isinstance(pos, int) or not (1 <= pos <= len(context)):
+        return f"`{context}`"
+    return f"`{context[:pos - 1]}**{context[pos - 1]}**{context[pos:]}`"
+
+
+# ── Markdown builder ──────────────────────────────────────────────────────────
+
+def _build_markdown(data: dict) -> str:
+    meta  = data["meta"]
+    inp   = data["input"]
+    top10 = data["top10"]
+
+    ts_fmt   = datetime.datetime.fromisoformat(meta["timestamp"]).strftime("%Y-%m-%d %H:%M:%S")
+    duration = (f"{meta['run_duration_s']:.1f} s"
+                if meta.get("run_duration_s") is not None else "N/A")
+    n_mut    = len(inp["mutations"])
+
+    L: List[str] = []
+
+    # ── Title ─────────────────────────────────────────────────────────────────
+    L += [
+        "# Neoantigen Screening Report",
+        "",
+        f"> Generated: {ts_fmt}  ·  HLA: `{inp['hla']}`  "
+        f"·  Mutations: {n_mut}  ·  Duration: {duration}",
+        "",
+        "---",
+        "",
     ]
 
-    out_path.write_text("\n".join(sections), encoding="utf-8")
-    return out_path
+    # ── 1. Run metadata ───────────────────────────────────────────────────────
+    L += [
+        "## 1. Run Metadata",
+        "",
+        "| Field | Value |",
+        "|---|---|",
+        f"| Timestamp | {ts_fmt} |",
+        f"| Run Duration | {duration} |",
+        f"| Input File | `{meta.get('input_file', 'N/A')}` |",
+        f"| Output Directory | `{meta.get('output_dir', 'N/A')}` |",
+        f"| LLM Orchestrator | `{meta.get('llm_model', 'N/A')}` |",
+        f"| MCMC Steps / Peptide | {meta.get('mcmc_steps', 'N/A')} |",
+        f"| Peptide Length | {meta.get('peptide_length', 9)} aa |",
+        f"| Top-N Output | {meta.get('top_n_output', 10)} |",
+        "",
+        "---",
+        "",
+    ]
+
+    # ── 2. Input ──────────────────────────────────────────────────────────────
+    L += [
+        "## 2. Input",
+        "",
+        f"**Patient HLA type:** `{inp['hla']}`  ",
+        f"**Tumor mutations ({n_mut} total):**",
+        "",
+        "| # | Gene | Protein Change | WT | Mut | Context (mut position bolded) | Pos in Context |",
+        "|---|------|---------------|----|----|-------------------------------|----------------|",
+    ]
+    for i, m in enumerate(inp["mutations"], 1):
+        gene    = m.get("gene", "?")
+        wt      = m.get("wt", "?")
+        mut_aa  = m.get("mut", "?")
+        pos     = m.get("pos", "?")
+        context = m.get("context", "?")
+        change  = f"{wt}→{mut_aa}"
+        L.append(
+            f"| {i} | **{gene}** | `{change}` | {wt} | {mut_aa} "
+            f"| {_hi_context(context, pos)} | {pos} |"
+        )
+
+    L += ["", "---", ""]
+
+    # ── 3. Pipeline ───────────────────────────────────────────────────────────
+    L += [
+        "## 3. Pipeline Steps",
+        "",
+        "| Step | Module | Role |",
+        "|------|--------|------|",
+        "| 1 | `mutation_processor` | Slide 9-mer windows over each mutation context |",
+        "| 2 | `AttABseq` (DL) | Predict binding affinity change Δ(ddG) per peptide |",
+        "| 3 | `ImmuneAI` (MCMC) | Simulated annealing — optimise for TCR recognition |",
+        "| 4 | `mhcflurry` | Predict HLA-peptide IC50 and percentile rank |",
+        "| 5 | `rank_candidates` | Multi-criteria composite score |",
+        "",
+        "**Composite score formula:**",
+        "```",
+        "composite = 0.4 × norm(|ddG|)  +  0.3 × norm(1/MCMC_loss)  +  0.3 × norm(1/%Rank)",
+        "```",
+        "",
+        "---",
+        "",
+    ]
+
+    # ── 4. Results table ──────────────────────────────────────────────────────
+    n_binders = sum(1 for c in top10 if c.get("binder"))
+
+    L += [
+        f"## 4. Top {len(top10)} Vaccine Candidates",
+        "",
+        f"**Strong HLA binders (IC50 < 500 nM, %Rank < 2%):** {n_binders} / {len(top10)}",
+        "",
+        "| Rank | Peptide | Gene | ddG | MCMC Loss | IC50 (nM) | %Rank | Binder | Score |",
+        "|------|---------|------|-----|-----------|-----------|-------|--------|-------|",
+    ]
+    for i, c in enumerate(top10, 1):
+        pep_opt  = c.get("optimized_peptide", c.get("peptide", "?"))
+        pep_orig = c.get("peptide", pep_opt)
+        gene     = c.get("gene", "?")
+        ddg      = _f(c.get("ddG"), ".3f")
+        mcmc     = _f(c.get("mcmc_loss"), ".3f")
+        ic50     = _f(c.get("ic50"), ".1f")
+        rank     = _f(c.get("percentile_rank"), ".3f") + "%"
+        score    = _f(c.get("composite_score", 0), ".4f")
+        binder   = "✓" if c.get("binder") else ("?" if c.get("ic50") is None else "✗")
+
+        pep_cell = (f"`{pep_opt}`" if pep_opt == pep_orig
+                    else f"`{pep_opt}` *(was `{pep_orig}`)*")
+
+        L.append(
+            f"| **{i}** | {pep_cell} | {gene} "
+            f"| {ddg} | {mcmc} | {ic50} | {rank} | {binder} | **{score}** |"
+        )
+
+    L += ["", "---", ""]
+
+    # ── 5. Per-candidate detail ───────────────────────────────────────────────
+    L += ["## 5. Candidate Detail", ""]
+    for i, c in enumerate(top10, 1):
+        pep   = c.get("optimized_peptide", c.get("peptide", "?"))
+        gene  = c.get("gene", "?")
+        score = _f(c.get("composite_score", 0), ".4f")
+        L += [
+            f"### Rank {i} — `{pep}` ({gene})  Score: {score}",
+            "",
+            f"- **Original peptide:** `{c.get('peptide', pep)}`",
+            f"- **Optimized peptide:** `{pep}`",
+            f"- **Mutation:** {c.get('mutation', 'N/A')}",
+            f"- **ddG (DL model):** {_f(c.get('ddG'), '.4f')}",
+            f"- **MCMC loss:** {_f(c.get('mcmc_loss'), '.4f')}",
+            f"- **IC50:** {_f(c.get('ic50'), '.2f')} nM",
+            f"- **%Rank:** {_f(c.get('percentile_rank'), '.4f')}%",
+            f"- **Presentation score:** {_f(c.get('presentation_score'), '.4f')}",
+            f"- **Strong binder:** {'Yes' if c.get('binder') else 'No'}",
+            "",
+        ]
+
+    L += ["---", ""]
+
+    # ── 6. Score reference ────────────────────────────────────────────────────
+    L += [
+        "## 6. Metric Reference",
+        "",
+        "| Metric | Better | Clinical Threshold |",
+        "|--------|--------|--------------------|",
+        "| `ddG` | Higher \\|ddG\\| | — (model limitation: values near 0 for short peptides) |",
+        "| `MCMC Loss` | Lower | < 2.0 good, < 1.5 excellent |",
+        "| `IC50 (nM)` | Lower | < 50 strong binder · < 500 binder · > 5000 non-binder |",
+        "| `%Rank` | Lower | < 0.5% strong · < 2.0% binder · > 2% weak/non-binder |",
+        "| `Composite` | Higher | > 0.6 promising · > 0.8 excellent |",
+        "",
+        "---",
+        "",
+        "*Report generated automatically — no LLM text generation.*",
+    ]
+
+    return "\n".join(L)

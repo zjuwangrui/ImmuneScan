@@ -3,43 +3,45 @@
   "mutations": [
     {
       "gene": "KRAS",
-      "pos": 9,
+      "pos": 8,
       "wt": "G",
       "mut": "D",
-      "context": "TEYKLVVVGAGGVGKS",
-      "note": "KRAS G12D — 胰腺癌/结直肠癌最常见驱动突变"
+      "context": "KLVVVGAGGVGKSAL"
+    },
+    {
+      "gene": "KRAS",
+      "pos": 8,
+      "wt": "G",
+      "mut": "V",
+      "context": "KLVVVGAGGVGKSAL"
+    },
+    {
+      "gene": "KRAS",
+      "pos": 7,
+      "wt": "Q",
+      "mut": "H",
+      "context": "ILDTAGQEEYSAMRD"
     },
     {
       "gene": "TP53",
-      "pos": 9,
+      "pos": 3,
       "wt": "R",
       "mut": "H",
-      "context": "SVVVPYEPRTVGSDCT",
-      "note": "TP53 R175H — 最高频肿瘤抑制基因热点突变"
+      "context": "VVRCPHHERCSDSDG"
     },
     {
       "gene": "BRAF",
-      "pos": 9,
+      "pos": 7,
       "wt": "V",
       "mut": "E",
-      "context": "CLATDFGLVKVGTPYW",
-      "note": "BRAF V600E — 黑色素瘤/甲状腺癌驱动突变"
+      "context": "DFGLATVKTRWSGSQ"
     },
     {
       "gene": "EGFR",
-      "pos": 9,
+      "pos": 8,
       "wt": "L",
       "mut": "R",
-      "context": "DFLSLIINLRQHLFSV",
-      "note": "EGFR L858R — 非小细胞肺癌靶向治疗相关突变"
-    },
-    {
-      "gene": "PIK3CA",
-      "pos": 9,
-      "wt": "H",
-      "mut": "R",
-      "context": "FSGFELTNHLVNKFQR",
-      "note": "PIK3CA H1047R — 乳腺癌/结直肠癌高频突变"
+      "context": "VKITDFGLAKLLGAE"
     }
   ]
 }

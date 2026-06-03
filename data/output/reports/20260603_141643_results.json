@@ -1,0 +1,222 @@
+{
+  "meta": {
+    "timestamp": "2026-06-03T14:16:43.120278",
+    "hla": "HLA-A*02:01",
+    "llm_model": "qwen3.6-plus",
+    "mcmc_steps": 500,
+    "peptide_length": 9,
+    "top_n_output": 10,
+    "run_duration_s": 144.9642415046692,
+    "input_file": "D:\\constructing_projects\\AI_project\\data\\input.json",
+    "output_dir": "D:\\constructing_projects\\AI_project\\data\\output"
+  },
+  "input": {
+    "hla": "HLA-A*02:01",
+    "mutations": [
+      {
+        "gene": "KRAS",
+        "pos": 8,
+        "wt": "G",
+        "mut": "D",
+        "context": "KLVVVGAGGVGKSAL"
+      },
+      {
+        "gene": "KRAS",
+        "pos": 8,
+        "wt": "G",
+        "mut": "V",
+        "context": "KLVVVGAGGVGKSAL"
+      },
+      {
+        "gene": "KRAS",
+        "pos": 7,
+        "wt": "Q",
+        "mut": "H",
+        "context": "ILDTAGQEEYSAMRD"
+      },
+      {
+        "gene": "TP53",
+        "pos": 3,
+        "wt": "R",
+        "mut": "H",
+        "context": "VVRCPHHERCSDSDG"
+      },
+      {
+        "gene": "BRAF",
+        "pos": 7,
+        "wt": "V",
+        "mut": "E",
+        "context": "DFGLATVKTRWSGSQ"
+      },
+      {
+        "gene": "EGFR",
+        "pos": 8,
+        "wt": "L",
+        "mut": "R",
+        "context": "VKITDFGLAKLLGAE"
+      }
+    ]
+  },
+  "top10": [
+    {
+      "peptide": "VVVGADGVG",
+      "wt_peptide": "VVVGAGGVG",
+      "gene": "KRAS",
+      "mutation": "G8D",
+      "context_pos": 5,
+      "ddG": 1.20479416847229,
+      "dl_score": 1.20479416847229,
+      "optimized_peptide": "YLFPFIFTV",
+      "mcmc_loss": 2.1477810218368036,
+      "ic50": 9.50860588496268,
+      "percentile_rank": 0.0,
+      "presentation_score": 0.9960049395908755,
+      "binder": true,
+      "composite_score": 0.9118
+    },
+    {
+      "peptide": "LVVVGAVGV",
+      "wt_peptide": "LVVVGAGGV",
+      "gene": "KRAS",
+      "mutation": "G8V",
+      "context_pos": 6,
+      "ddG": 0.9147319197654724,
+      "dl_score": 0.9147319197654724,
+      "optimized_peptide": "RLFPFIFTV",
+      "mcmc_loss": 2.131545300746862,
+      "ic50": 10.289706276905964,
+      "percentile_rank": 0.002,
+      "presentation_score": 0.9959517060769622,
+      "binder": true,
+      "composite_score": 0.8466
+    },
+    {
+      "peptide": "ITDFGRAKL",
+      "wt_peptide": "ITDFGLAKL",
+      "gene": "EGFR",
+      "mutation": "L8R",
+      "context_pos": 5,
+      "ddG": 1.255601167678833,
+      "dl_score": 1.255601167678833,
+      "optimized_peptide": "RLFPFIFTL",
+      "mcmc_loss": 2.160684326836849,
+      "ic50": 11.733930610663828,
+      "percentile_rank": 0.013,
+      "presentation_score": 0.9944660132679533,
+      "binder": true,
+      "composite_score": 0.8234
+    },
+    {
+      "peptide": "VVVGAVGVG",
+      "wt_peptide": "VVVGAGGVG",
+      "gene": "KRAS",
+      "mutation": "G8V",
+      "context_pos": 5,
+      "ddG": 1.4137769937515259,
+      "dl_score": 1.4137769937515259,
+      "optimized_peptide": "RLFPFVFTL",
+      "mcmc_loss": 2.1866575137691378,
+      "ic50": 11.803976113885918,
+      "percentile_rank": 0.013,
+      "presentation_score": 0.9947722459315721,
+      "binder": true,
+      "composite_score": 0.8216
+    },
+    {
+      "peptide": "KLVVVGADG",
+      "wt_peptide": "KLVVVGAGG",
+      "gene": "KRAS",
+      "mutation": "G8D",
+      "context_pos": 7,
+      "ddG": 0.9300532937049866,
+      "dl_score": 0.9300532937049866,
+      "optimized_peptide": "RLFPFPFTV",
+      "mcmc_loss": 2.1582472694896113,
+      "ic50": 10.531978419390981,
+      "percentile_rank": 0.002875,
+      "presentation_score": 0.995962258894441,
+      "binder": true,
+      "composite_score": 0.7977
+    },
+    {
+      "peptide": "GADGVGKSA",
+      "wt_peptide": "GAGGVGKSA",
+      "gene": "KRAS",
+      "mutation": "G8D",
+      "context_pos": 2,
+      "ddG": 0.8446968793869019,
+      "dl_score": 0.8446968793869019,
+      "optimized_peptide": "YLFPFIFTL",
+      "mcmc_loss": 2.1769200479267905,
+      "ic50": 9.955554087407222,
+      "percentile_rank": 0.000625,
+      "presentation_score": 0.9944208611125774,
+      "binder": true,
+      "composite_score": 0.7538
+    },
+    {
+      "peptide": "LVVVGADGV",
+      "wt_peptide": "LVVVGAGGV",
+      "gene": "KRAS",
+      "mutation": "G8D",
+      "context_pos": 6,
+      "ddG": 0.7384682893753052,
+      "dl_score": 0.7384682893753052,
+      "optimized_peptide": "YLFDFIFTV",
+      "mcmc_loss": 2.1833775023321875,
+      "ic50": 9.257471602837219,
+      "percentile_rank": 0.0,
+      "presentation_score": 0.993353786686463,
+      "binder": true,
+      "composite_score": 0.716
+    },
+    {
+      "peptide": "VGAVGVGKS",
+      "wt_peptide": "VGAGGVGKS",
+      "gene": "KRAS",
+      "mutation": "G8V",
+      "context_pos": 3,
+      "ddG": 0.5974556803703308,
+      "dl_score": 0.5974556803703308,
+      "optimized_peptide": "YLFPFPFTV",
+      "mcmc_loss": 2.1744829905795524,
+      "ic50": 9.438040441609386,
+      "percentile_rank": 0.0,
+      "presentation_score": 0.9964343988553245,
+      "binder": true,
+      "composite_score": 0.6921
+    },
+    {
+      "peptide": "GAVGVGKSA",
+      "wt_peptide": "GAGGVGKSA",
+      "gene": "KRAS",
+      "mutation": "G8V",
+      "context_pos": 2,
+      "ddG": 0.8867248892784119,
+      "dl_score": 0.8867248892784119,
+      "optimized_peptide": "YLYDYIFTV",
+      "mcmc_loss": 2.236756080545741,
+      "ic50": 9.27176878824035,
+      "percentile_rank": 0.0,
+      "presentation_score": 0.9963040720731466,
+      "binder": true,
+      "composite_score": 0.6623
+    },
+    {
+      "peptide": "GLATEKTRW",
+      "wt_peptide": "GLATVKTRW",
+      "gene": "BRAF",
+      "mutation": "V7E",
+      "context_pos": 4,
+      "ddG": 1.0607948303222656,
+      "dl_score": 1.0607948303222656,
+      "optimized_peptide": "RLLDFIFTL",
+      "mcmc_loss": 2.241115111827344,
+      "ic50": 11.09648383505633,
+      "percentile_rank": 0.007375,
+      "presentation_score": 0.9953752664262189,
+      "binder": true,
+      "composite_score": 0.6586
+    }
+  ]
+}

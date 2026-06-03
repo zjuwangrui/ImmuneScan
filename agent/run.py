@@ -9,6 +9,7 @@ Edit that file to change HLA type or mutations.
 """
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,7 @@ sys.path.insert(0, str(ROOT))
 
 from config import CONFIG
 from agent.agent import run_agent
+from agent.report_writer import write_report
 
 
 def _load_input() -> tuple[str, list[Any]]:
@@ -72,9 +74,20 @@ def main():
     print(f"  Input     : {CONFIG['input_file']}")
     print("-" * 50)
 
+    t0 = time.time()
     result = run_agent(hla_type=hla, mutations=mutations)
 
+    elapsed = time.time() - t0
     _print_table(result["top10"])
+
+    report_path = write_report(
+        hla=hla,
+        mutations=mutations,
+        top10=result["top10"],
+        config=CONFIG,
+        run_duration_s=elapsed,
+    )
+    print(f"\nReport saved to: {report_path}")
 
 
 if __name__ == "__main__":
