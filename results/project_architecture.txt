@@ -1,0 +1,115 @@
+AI_project/
+├── config.py                       ← 集中配置：LLM、模型路径、MCMC 超参、I/O
+├── requirements.txt                ← pip 依赖清单
+├── README.md
+│
+├── agent/                          ← LLM 编排层
+│   ├── agent.py                    ← OpenAI 兼容 API + tool_use 主循环；
+│   │                                  会话内 _STORE 缓存候选肽，工具间链式传递；
+│   │                                  含 _rank_candidates() 多准则综合打分
+│   ├── run.py                      ← CLI 入口：读取 data/input.json → 运行 Agent
+│   │                                  → 打印 Top-10 表 → 调用 report_writer
+│   └── report_writer.py            ← 纯模板报告生成（无 LLM 文本生成）
+│                                      输出 Markdown + JSON 双份结果
+│
+├── tools/                          ← Agent 可调用的四个工具（function-calling）
+│   ├── mutation_processor.py       ← 突变上下文 → 9-mer 候选肽滑窗
+│   ├── dl_scorer.py                ← 调 AttABseq 预测 ddG 结合亲和力变化
+│   ├── mcmc_optimizer.py           ← 调 ImmuneAI 模拟退火优化 T 细胞识别
+│   └── netmhc_validator.py         ← 调 mhcflurry 预测 HLA-肽 IC50 / %Rank
+│
+├── models/                         ← 底层预测模型实现
+│   ├── attabseq/                   ← 抗体-抗原结合亲和力深度学习模型
+│   │   ├── model.py / main.py / predict.py / predict_api.py
+│   │   ├── data_preprocessing.py / mol_featurizer.py / seq2vec.py / word2vec.py
+│   │   ├── load.py / Radam.py / lookahead.py / pytorchtools.py
+│   │   ├── interpre.py / interpre_csv.py        ← 可解释性分析
+│   │   └── plot_*.py / run_heatmap_analysis.py  ← 可视化与热图
+│   └── immuneai/                   ← TCR-肽识别 MCMC/SA 优化器
+│       ├── main.py                 ← 训练 / 评估主函数
+│       ├── Policy.py / Loss.py     ← 策略网络 + 损失函数
+│       ├── process.py / addition_func.py / arg_parse.py
+│
+├── data/
+│   ├── input.json                  ← 患者输入：HLA 类型 + 肿瘤突变列表
+│   ├── attabseq/                   ← AttABseq 训练 / 预测数据（CSV + npy 特征）
+│   ├── immuneai/                   ← ImmuneAI 数据库（TCR + IEDB pHLA 肽段）
+│   └── output/                     ← 流水线运行产物
+│       ├── <PEPTIDE>/              ← 每条候选肽一个子目录
+│       │   ├── *_Details_logfile.txt
+│       │   └── *_Frequencymap.txt
+│       └── reports/                ← 最终报告
+│           ├── <timestamp>_report.md       ← Markdown 报告
+│           └── <timestamp>_results.json    ← 机读结果（供可视化脚本消费）
+│
+├── checkpoints/
+│   └── attabseq/                   ← 3 个预训练权重
+│       ├── best_pcc_model/
+│       ├── best_r2_model/
+│       └── loss_min_model/
+│
+├── scripts/                        ← 可视化与辅助脚本
+│   └── visualize.py                ← 读取 reports/*_results.json 生成 5 张图：
+│                                      01_pipeline_flow / 02_composite_scores /
+│                                      03_ic50_rank_scatter / 04_metrics_heatmap /
+│                                      05_agent_advantage（输出到 docs/figures/<ts>/）
+│
+├── docs/                           ← 文档与图表（按运行时间戳分子目录归档）
+│   ├── agent_performance.md
+│   └── figures/
+│
+├── results/                        ← 项目总结性资料
+│   ├── prject_architecture.txt     ← 本文件
+│   ├── data_source.md              ← 数据来源说明
+│   ├── metric_explanation.md       ← 评分指标说明
+│   └── figures/                    ← 最新一次运行的代表性图表快照
+│
+└── history/                        ← 历史归档
+
+
+────────────────────────────────────────────────────────────────────
+流水线（agent.py 中 LLM 通过 tool_use 顺序调用）：
+────────────────────────────────────────────────────────────────────
+  Input (data/input.json: HLA + mutations)
+       │
+       ▼
+  1. generate_candidates   →  mutation_processor.py    （9-mer 滑窗）
+       │
+       ▼
+  2. score_with_dl         →  dl_scorer.py             （AttABseq → ddG）
+       │
+       ▼
+  3. optimize_with_mcmc    →  mcmc_optimizer.py        （ImmuneAI → MCMC loss）
+       │
+       ▼
+  4. validate_hla_binding  →  netmhc_validator.py      （mhcflurry → IC50/%Rank）
+       │
+       ▼
+  _rank_candidates()  综合打分：
+      composite = 0.4·norm(|ddG|) + 0.3·norm(1/MCMC_loss) + 0.3·norm(1/%Rank)
+       │
+       ▼
+  report_writer.write_report()  →  data/output/reports/<ts>_report.md + .json
+       │
+       ▼
+  scripts/visualize.py          →  docs/figures/<ts>/*.png
+
+
+────────────────────────────────────────────────────────────────────
+运行方式：
+────────────────────────────────────────────────────────────────────
+  # 1. 安装依赖
+  pip install -r requirements.txt
+  mhcflurry-downloads fetch
+
+  # 2. 设置 LLM API Key
+  export DASHSCOPE_API_KEY=<your_key>
+
+  # 3. 编辑输入（HLA + 突变）
+  vim data/input.json
+
+  # 4. 运行 Agent（生成 Top-10 报告）
+  python agent/run.py
+
+  # 5. 生成可视化图表（自动读取最新 *_results.json）
+  python scripts/visualize.py
